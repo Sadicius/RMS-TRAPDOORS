@@ -1,4 +1,4 @@
-RSGCore = exports['rsg-core']:GetCoreObject()
+local RSGCore = exports['rsg-core']:GetCoreObject()
 
 GlobalState.trapdoors = {}
 
@@ -10,20 +10,10 @@ end
 
 RegisterServerEvent('movable_object:toggleObject')
 AddEventHandler('movable_object:toggleObject', function(args)
-    
-    
-    
     args.open = not args.open
-    
-    
-    
-   
     updateTrapdoorState(args.objectName, args.open)
-    
-   
     TriggerClientEvent('movable_object:setObjectPosition', -1, args)
 end)
-
 
 RSGCore.Functions.CreateCallback('movable_object:server:GetTrapdoorStates', function(source, cb)
     cb(GlobalState.trapdoors)

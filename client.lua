@@ -1,6 +1,7 @@
-RSGCore = exports['rsg-core']:GetCoreObject()
+local RSGCore = exports['rsg-core']:GetCoreObject()
 local openTrapdoors = {}
 Zones = {}
+lib.locale()
 
 local trapdoorTimers = {}
 Citizen.CreateThread(function()
@@ -89,14 +90,14 @@ function setTimeout(callback, ms)
         handle = nil,
         callback = callback
     }
-    
+
     timer.handle = CreateThread(function()
         Wait(ms)
         if timer.callback then
             timer.callback()
         end
     end)
-    
+
     return timer
 end
 
@@ -111,117 +112,90 @@ function SmoothMoveObject(object, targetPosition, targetRotation, duration, conf
     local startPosition = GetEntityCoords(object)
     local startRotation = GetEntityRotation(object)
     local progress = 0.0
-    
-    
-    
-    RemoveTargetModel(config.objectName)
-    
-    
-    if not DoesEntityExist(object) then
-       
-        return
-    end
 
-    
+    RemoveTargetModel(config.objectName)
+
+    if not DoesEntityExist(object) then return end
+
     SetEntityAsMissionEntity(object, true, true)
 
     while progress <= 1.0 do
         Citizen.Wait(0)
         progress = progress + (1.0 / (duration * 30.0))
         if progress > 1.0 then progress = 1.0 end
-        
+
         local currentPosition = LerpVector(startPosition, targetPosition, progress)
         local currentRotation = vector3(
             LerpAngle(math.rad(startRotation.x), math.rad(targetRotation.x), progress),
             LerpAngle(math.rad(startRotation.y), math.rad(targetRotation.y), progress),
             LerpAngle(math.rad(startRotation.z), math.rad(targetRotation.z), progress)
         )
-        
+
         if DoesEntityExist(object) then
             SetEntityCoords(object, currentPosition.x, currentPosition.y, currentPosition.z, false, false, false, true)
             SetEntityRotation(object, math.deg(currentRotation.x), math.deg(currentRotation.y), math.deg(currentRotation.z),
                 2, true)
         else
-            
             break
         end
     end
 
-    
-    
     if config.open then
-       
         openTrapdoors[config.objectName] = object
     else
-        
         openTrapdoors[config.objectName] = nil
     end
-    
-    
+
     local isTrackedAsOpen = (openTrapdoors[config.objectName] ~= nil)
-   
-    
-    
     AssignModelEntity(config, false)
 end
 
 CreateThread(function()
     while true do
-        Wait(3000) 
-        
-        
+        Wait(3000)
         RSGCore.Functions.TriggerCallback('movable_object:server:GetTrapdoorStates', function(states)
             if states then
-                
+
                 for modelName, isOpen in pairs(states) do
-                    
+
                     local config = Config.Trapdoors[modelName]
                     if config then
                         local playerCoords = GetEntityCoords(PlayerPedId())
                         local foundTrapdoorObject = GetClosestObjectOfType(
-                            playerCoords.x, playerCoords.y, playerCoords.z, 
+                            playerCoords.x, playerCoords.y, playerCoords.z,
                             100.0, joaat(modelName), false, false, false
                         )
-                        
-                        
+
                         if isOpen then
                             if not openTrapdoors[modelName] and DoesEntityExist(foundTrapdoorObject) then
                                 openTrapdoors[modelName] = foundTrapdoorObject
-                                
-                               
-                                SetEntityCoords(foundTrapdoorObject, 
-                                    config.openPosition.x, 
-                                    config.openPosition.y, 
-                                    config.openPosition.z, 
+                                SetEntityCoords(foundTrapdoorObject,
+                                    config.openPosition.x,
+                                    config.openPosition.y,
+                                    config.openPosition.z,
                                     false, false, false, true)
-                                SetEntityRotation(foundTrapdoorObject, 
-                                    config.openYaw.x, 
-                                    config.openYaw.y, 
-                                    config.openYaw.z, 
+                                SetEntityRotation(foundTrapdoorObject,
+                                    config.openYaw.x,
+                                    config.openYaw.y,
+                                    config.openYaw.z,
                                     2, true)
-                                
-                                
                                 AssignModelEntity(config, false)
                             end
                         else
                             if openTrapdoors[modelName] then
                                 openTrapdoors[modelName] = nil
-                                
-                                
                                 if DoesEntityExist(foundTrapdoorObject) then
-                                    SetEntityCoords(foundTrapdoorObject, 
-                                        config.closedPosition.x, 
-                                        config.closedPosition.y, 
-                                        config.closedPosition.z, 
+                                    SetEntityCoords(foundTrapdoorObject,
+                                        config.closedPosition.x,
+                                        config.closedPosition.y,
+                                        config.closedPosition.z,
                                         false, false, false, true)
-                                    SetEntityRotation(foundTrapdoorObject, 
-                                        config.closedYaw.x, 
-                                        config.closedYaw.y, 
-                                        config.closedYaw.z, 
+                                    SetEntityRotation(foundTrapdoorObject,
+                                        config.closedYaw.x,
+                                        config.closedYaw.y,
+                                        config.closedYaw.z,
                                         2, true)
                                 end
-                                
-                                
                                 AssignModelEntity(config, false)
                             end
                         end
@@ -229,78 +203,60 @@ CreateThread(function()
                 end
             end
         end)
-        
         Wait(3000)
     end
 end)
 
 function RemoveTargetModel(modelName)
-   
     exports.ox_target:removeModel(joaat(modelName))
 end
 
 Citizen.CreateThread(function()
-    
     Wait(1000)
-    
+
     for object, config in pairs(Config.Trapdoors) do
-        
         if GlobalState.trapdoors and GlobalState.trapdoors[object] then
-            
             local playerCoords = GetEntityCoords(PlayerPedId())
-            local foundObject = GetClosestObjectOfType(playerCoords.x, playerCoords.y, playerCoords.z, 100.0,
-                joaat(object), false, false, false)
-                
+            local foundObject = GetClosestObjectOfType(playerCoords.x, playerCoords.y, playerCoords.z, 100.0, joaat(object), false, false, false)
+
             if DoesEntityExist(foundObject) then
                 openTrapdoors[object] = foundObject
             end
         end
-        
-       
+
         AssignModelEntity(config, false)
     end
 end)
 
 function AssignModelEntity(config, inProgress)
-    
+
     RemoveTargetModel(config.objectName)
-    
-    
-    
-    
+
     if not inProgress then
         local options = {}
         local isCurrentlyOpen = openTrapdoors[config.objectName] ~= nil
-        
-        
+
         if isCurrentlyOpen then
-            
-            
             options[#options+1] = {
                 name = 'close_trapdoor_' .. config.objectName,
-                icon = 'fas fa-hand',
-                label = 'Close',
+                icon = 'fas fa-lock',
+                label = locale('cl_close'),
                 onSelect = function()
-                    
                     MoveTrapdoor(config.objectName, config)
                 end,
                 distance = config.interactRange or 2.0
             }
         else
-            
-            
             options[#options+1] = {
                 name = 'open_trapdoor_' .. config.objectName,
-                icon = 'fas fa-hand',
-                label = 'Open',
+                icon = 'fas fa-unlock',
+                label = locale('cl_open'),
                 onSelect = function()
-                   
                     MoveTrapdoor(config.objectName, config)
                 end,
                 distance = config.interactRange or 2.0
             }
         end
-        
         exports.ox_target:addModel(joaat(config.objectName), options)
     end
 end
@@ -313,26 +269,14 @@ function LoadAnimDict(dict)
 end
 
 function MoveTrapdoor(trapdoorObject, config)
-    
-    
     local playerCoords = GetEntityCoords(PlayerPedId())
-    local foundTrapdoorObject = GetClosestObjectOfType(playerCoords.x, playerCoords.y, playerCoords.z, 40.0,
-        joaat(trapdoorObject), false, false, false)
-    
-    
-    
-    
+    local foundTrapdoorObject = GetClosestObjectOfType(playerCoords.x, playerCoords.y, playerCoords.z, 40.0, joaat(trapdoorObject), false, false, false)
+
     local trapdoorOpen = (openTrapdoors[trapdoorObject] ~= nil)
-    
-    
-    
-    
     if DoesEntityExist(foundTrapdoorObject) then
         local currentPos = GetEntityCoords(foundTrapdoorObject)
         local currentRot = GetEntityRotation(foundTrapdoorObject)
-        
-        
-        
+
         local objectCoords = GetEntityCoords(foundTrapdoorObject)
         if Vdist(playerCoords, objectCoords) <= config.interactRange then
             local playerPed = PlayerPedId()
@@ -353,13 +297,12 @@ function MoveTrapdoor(trapdoorObject, config)
                 interactRange = config.interactRange
             }
 
-           
             TriggerServerEvent('movable_object:toggleObject', args)
         else
-           
+
         end
     else
-        
+
     end
 end
 
@@ -369,27 +312,23 @@ AddEventHandler('movable_object:setObjectPosition', function(args)
     local newPosition = isOpen and args.openPosition or args.closedPosition
     local newYaw = isOpen and args.openYaw or args.closedYaw
     local duration = 10
-    
-    
-    
-  
+
     if DoesEntityExist(args.objectHash) then
-        
         SmoothMoveObject(args.objectHash, newPosition, newYaw, duration, args)
     else
-       
+
         local playerCoords = GetEntityCoords(PlayerPedId())
         local foundObject = GetClosestObjectOfType(
             playerCoords.x, playerCoords.y, playerCoords.z, 
             100.0, joaat(args.objectName), false, false, false
         )
-        
+
         if DoesEntityExist(foundObject) then
-            
+
             args.objectHash = foundObject
             SmoothMoveObject(foundObject, newPosition, newYaw, duration, args)
         else
-            
+
         end
     end
 end)
